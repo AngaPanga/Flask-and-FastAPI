@@ -1,37 +1,32 @@
-# ДЗ 1
-
-from flask import Flask
-from flask import render_template
+from flask import *
 
 app = Flask(__name__)
+app.secret_key = b'5f214cacbd30c2ae4784b520f17912ae0d5d8c16ae98128e3f549546221265e4'
 
-@app.route('/')
-def start():
-    return render_template('start.html')
 
-@app.route('/contacts/')
-def contacts():
-    return render_template('contacts.html')
+@app.get('/')
+def get_index():
+    #if request.cookies.get('Username'):
+    return f"Привет, {request.cookies.get('Username')}" \
+            f"<br>e-mail  -  {request.cookies.get('Email')}"
+    #else:
+    #    return redirect(url_for('login'))
 
-@app.route('/catalog/')
-def catalog():
-    return render_template('catalog.html')
 
-@app.route('/bmw/')
-def bmw():
-    return render_template('bmw.html')
+@app.post('/')
+def post_index():
+    return redirect(url_for('login'))
 
-@app.route('/audi/')
-def audi():
-    return render_template('audi.html')
 
-@app.route('/ford/')
-def ford():
-    return render_template('ford.html')
-
-@app.route('/hot-rod/')
-def hotrod():
-    return render_template('hot-rod.html')
+@app.route('/login/', methods=['GET', 'POST'])
+def login():
+    context = {'title': 'Вход'}
+    response = make_response(render_template('login.html', **context))
+    if request.method == 'POST':
+        response.set_cookie('Username', request.form.get('name'))
+        response.set_cookie('Email', request.form.get('mail'))
+        return redirect(url_for('index'))
+    return response
 
 
 if __name__ == '__main__':
