@@ -1,69 +1,91 @@
-from flask import *
-from flask_wtf import CSRFProtect
-from models import *
-from forms import *
-from werkzeug.security import generate_password_hash, check_password_hash
+import uvicorn
+from fastapi import FastAPI, Request
+from typing import Optional
+from pydantic import BaseModel
+from fastapi import HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users_base.db'
-db.init_app(app)
-
-app.secret_key = b'5f214cacbd30c2ae4784b520f17912ae0d5d8c16ae98128e3f549546221265e4'
-csrf = CSRFProtect(app)
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 
-@app.route('/')
-def hi():
-    return "OK"
+class InputUser(BaseModel):
+    login: str
+    password: str
+    email: str
+    description: Optional[str] = None
 
 
-@app.route('/lock/', methods=['GET', 'POST'])
-def lock():
-    form = LoginForm()
-    if request.method == 'POST' and form.validate():
-        login = form.login.data
-        password = form.password.data
-        exis_user = User.query.filter_by(login=login).first()
-        if exis_user and check_password_hash(exis_user.password, password):
-            return 'Lock in is successful'
-        else:
-            form.login.errors.append('Пользователя с таким логином не существует!')
-            form.password.errors.append('Или пароль неверный!')
-            return render_template('lock.html', form=form)
-    return render_template('lock.html', form=form)
+class User(InputUser):
+    id: int
 
 
-@app.route('/reg/', methods=['GET', 'POST'])
-def reg_form():
-    form = RegistrationForm()
-    if request.method == 'POST' and form.validate():
-        # Взятие данных из формы
-        login = form.login.data
-        email = form.email.data
-        password = generate_password_hash(form.password.data)
-        # Поиск пользователя в БД
-        exis_user = User.query.filter(User.login == login).first()
-        if exis_user:
-            form.login.errors.append('Пользователь с таким логином уже существует!')
-            return render_template('registration.html', form=form)
-        user = User(login=login, email=email, password=password)
-        db.session.add(user)
-        db.session.commit()
-        return 'Registration success!'
-    return render_template('registration.html', form=form)
+users = [
+    User(id=1,
+         login='Apa',
+         password='12345',
+         email='apa@mail.ru'
+         )
+]
 
 
-# Помню что передавать чистые данные нельзя, но смог разобраться с плагином на чтение бд
-@app.route('/dbu/')
-def db_users():
-    users = User.query.all()
-    context = {'users': users}
-    return render_template('db.html', **context)
+@app.get("/", response_model=list[User])
+async def users_list():
+    return users
+
+
+@app.post("/input_user/", response_model=User)
+async def create_task(data: InputUser):
+    id_u = len(users) + 1
+    user = User(
+        id=id_u,
+        login=data.login,
+        password=data.password,
+        email=data.email,
+        description=data.description
+    )
+    users.append(user)
+    return user
+
+
+@app.get("/user/{id}", response_model=User)
+async def get_task_by_id_root(id_u: int):
+    for user in users:
+        if user.id == id_u:
+            return user
+
+
+@app.put("/rep_us/{id}", response_model=User)
+async def replace_user(id_u: int, new_data: InputUser):
+    for user in users:
+        if user.id == id_u:
+            user.login = new_data.login
+            user.password = new_data.password
+            user.email = new_data.email
+            user.description = new_data.description
+            return user
+    raise HTTPException(status_code=404, detail="User not found!")
+
+
+@app.delete("/del_user/{id}")
+async def delete_user(id_u: int):
+    for user in users:
+        if user.id == id_u:
+            users.remove(user)
+            return users
+    raise HTTPException(status_code=404, detail="User not found")
+
+
+@app.get("/list_users/", response_class=HTMLResponse)
+async def list_users(request: Request):
+    return templates.TemplateResponse("db.html", {"request": request, 'users': users})
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    print('OK')
-    app.run(debug=True)
-
+    uvicorn.run(
+        "main:app",
+        # host="127.0.0.1",
+        # port=8000,
+        reload=True
+    )

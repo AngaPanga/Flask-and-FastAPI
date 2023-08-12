@@ -8,9 +8,11 @@
     <div class="row">
     {% for user in users %}
         <p>
+            ID: {{ user.id }}<br>
             Логин: {{ user.login }}<br>
             Email: {{ user.email }}<br>
-            Пароль: {{ user.password }}
+            Пароль: {{ user.password }}<br>
+            Описание: {{ user.description }}
         </p>
     {% endfor %}
     </div>
